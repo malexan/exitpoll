@@ -6,7 +6,12 @@ str_extract_numbs <- function(s) {
   as.integer(unlist(charlist))
 }
 
-melt_text <- function(id, text) {
+melt_text <- function(id, data, id.name = 'id', text.name = 'text') {
+  if(length(id) > 1) return(dplyr::rbind_all(lapply(id, melt_text, data = data,
+                                   id.name = id.name,
+                                   text.name = text.name)))
+  
+  text <- data[[text.name]][data[[id.name]]==id]
   numbers <- str_extract_numbs(text)
   data.frame(id = id,
              position = seq_along(numbers),
