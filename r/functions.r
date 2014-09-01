@@ -1,3 +1,6 @@
+source('r/smstower.r')
+
+
 str_extract_numbs <- function(s) {
   if(length(s) > 1) return(lapply(s, str_extract_digs))
   library(stringr)
@@ -32,3 +35,7 @@ melt_text <- function(id, data, deadline,
              value = numbers)
 }
 
+read_config <- function(filename = 'config.yml') {
+  library(yaml)
+  yaml.load_file('config.yml')
+}
