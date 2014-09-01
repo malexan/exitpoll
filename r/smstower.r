@@ -50,7 +50,7 @@ smstower_sendsms <- function(text, recipient, sender, user, passwd) {
     sender = sender
   )
   
-  # Supress warning "Found possible curl options in form parameters: password"
+  # Suppress warning "Found possible curl options in form parameters: password"
   response <- suppressWarnings(postForm(url, .params = pars))
   response
   
