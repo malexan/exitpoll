@@ -1,4 +1,4 @@
-get_smstower <- function(login, passwd, used) {
+smstower_getdata <- function(user, passwd, used) {
   
   library(RCurl)
   library(dplyr)
@@ -9,7 +9,7 @@ get_smstower <- function(login, passwd, used) {
   
   pars <- list(
     Submit = "1",
-    login = login,
+    login = user,
     pass = passwd
   )
   
@@ -36,4 +36,22 @@ get_smstower <- function(login, passwd, used) {
     mutate(time = dmy_hm(time))
   
   data
+}
+
+smstower_sendsms <- function(text, recipient, sender, user, passwd) {
+  
+  library(RCurl)
+  url <- "http://clients.smstower.ru/sender.v2.php"
+  pars <- list(
+    login = user,
+    password = passwd,
+    phone = recipient,
+    sms = text,
+    sender = sender
+  )
+  
+  # Supress warning "Found possible curl options in form parameters: password"
+  response <- suppressWarnings(postForm(url, .params = pars))
+  response
+  
 }
