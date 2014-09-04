@@ -19,8 +19,7 @@ reported_hour <- function(smstime, deadline) {
 
 melt_text <- function(id, data, deadline,
                       id.name = 'id', 
-                      text.name = 'text', 
-                      time.name = 'time') {
+                      text.name = 'text') {
   if(length(id) > 1) return(dplyr::rbind_all(lapply(id, melt_text, data = data,
                                                     deadline = deadline,
                                                     id.name = id.name,
@@ -28,9 +27,7 @@ melt_text <- function(id, data, deadline,
   
   text <- data[[text.name]][data[[id.name]]==id]
   numbers <- str_extract_numbs(text)
-  hour <- reported_hour(data[[time.name]][data[[id.name]]==id], deadline)
   data.frame(id = id,
-             hour = hour,
              position = seq_along(numbers),
              value = numbers)
 }
@@ -38,4 +35,41 @@ melt_text <- function(id, data, deadline,
 read_config <- function(filename = 'config.yml') {
   library(yaml)
   yaml.load_file('config.yml')
+}
+
+# initiate_db <- function
+
+
+
+simulate_report <- function(station, hour, candidates, 
+                            turnout.prob, refuse.prob,
+                            stationsdata) {
+  
+  library(stringr)
+  
+  if(missing(turnout.prob)) turnout.prob <- 
+    c(123, 204, 327, 312, 372, 301, 253, 175, 149, 116, 116, 116)/12791
+  
+  if(missing(refuse.prob)) refuse.prob <- 664/2332
+  
+  if(length(station) > 1) return(unlist(
+    lapply(station, simulate_report, hour = hour, candidates = candidates, 
+           turnout.prob = turnout.prob, refuse.prob = refuse.prob,
+           stationsdata = stationsdata)))
+  
+  turnout <- round(stationsdata$voters[stationsdata$station == station] *
+                     rnorm(1, mean = turnout.prob[hour - 8], sd = 0.01))
+  if(turnout < 0) turnout <- 0
+  
+  refuse <- round(turnout * rnorm(1, refuse.prob, .02))
+  if(refuse < 0) refuse <- 0
+  
+  if(length(candidates) == 1) candid.probs <- rep(1/candidates, candidates)
+  if(length(candidates) > 1) candid.probs <- candidates
+  
+  candidates <- rmultinom(1, size = turnout - refuse, prob = candid.probs)[,1]
+  
+  report <- str_c(station, turnout, refuse, 
+                  str_c(candidates, collapse = ' '), sep = ' ')
+  report
 }
