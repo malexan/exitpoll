@@ -52,10 +52,13 @@ simulate_report <- function(station, hour, candidates,
   
   if(missing(refuse.prob)) refuse.prob <- 664/2332
   
-  if(length(station) > 1) return(unlist(
+  if(length(station) > 1) return(dplyr::rbind_all(
     lapply(station, simulate_report, hour = hour, candidates = candidates, 
            turnout.prob = turnout.prob, refuse.prob = refuse.prob,
            stationsdata = stationsdata)))
+  
+  if(!(station %in% stationsdata$station)) 
+    stop (paste("Station #", station, " is not in the database", sep = ''))
   
   turnout <- round(stationsdata$voters[stationsdata$station == station] *
                      rnorm(1, mean = turnout.prob[hour - 8], sd = 0.01))
@@ -66,11 +69,20 @@ simulate_report <- function(station, hour, candidates,
   
   if(length(candidates) == 1) candid.probs <- rep(1/candidates, candidates)
   if(length(candidates) > 1) candid.probs <- candidates
-  
   candidates <- rmultinom(1, size = turnout - refuse, prob = candid.probs)[,1]
   
-  report <- str_c(station, turnout, refuse, 
+  text <- str_c(station, turnout, refuse, 
                   str_c(candidates, collapse = ' '), sep = ' ')
+  
+  if(!exists(".simulated_sms_id")) .simulated_sms_id <<- 10000 else
+    .simulated_sms_id <<- .simulated_sms_id + 1
+  
+  report <- data.frame(id = .simulated_sms_id, 
+                       text = text,
+                       time = now(),
+                       agent = config$testphone,
+                       stringsAsFactors = F)
+  
   report
 }
 
@@ -82,7 +94,20 @@ add_used_sms <- function(new_used, conn, table) {
   
 }
 
-
+validate_sms <- function(sms, test.types) {
+  if(missing(test.types)) test.types <- c('digits', 'uik',
+                                          'amount', 'sum')
+  results <- data.frame(id = sms$id)
+  
+  if('digits' %in% test.types) {
+    digits <- unlist(lapply(sms$text, function(x) {
+      numbs <- str_extract_numbs(x)
+      as.integer(length(numbs) > 0)
+    }))
+    results <- cbind(results, digits)
+  }
+  results
+}
 
 full_run <- function(simulate) {
   library(dplyr)
