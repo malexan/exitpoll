@@ -73,3 +73,34 @@ simulate_report <- function(station, hour, candidates,
                   str_c(candidates, collapse = ' '), sep = ' ')
   report
 }
+
+add_used_sms <- function(new_used, conn, table) {
+  library(DBI)
+  dbWriteTable(conn$con, table,
+               data.frame(id = new_used), 
+               append = T, row.names = F)
+  
+}
+
+
+
+full_run <- function(simulate) {
+  library(dplyr)
+  source('r/functions.r')
+  
+  config <- read_config()
+  
+  ep_db <- src_postgres(dbname = config$db$db, 
+                        host = config$db$host, 
+                        user = config$db$user,
+                        password = config$db$pass)
+  
+  used_remote_tbl <- tbl(ep_db, "used")
+  
+  data <- smstower_getdata(config$smstower$user, 
+                          config$smstower$pass, 
+                          as.data.frame(used_remote_tbl)$id[-100])
+  
+  new_used_sms <-data$id
+  
+}
