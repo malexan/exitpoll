@@ -139,7 +139,6 @@ full_run <- function(simulate) {
 
 demo_run <- function() {
   library(dplyr)
-  source('r/functions.r')
   
   config <- read_config()
   
@@ -147,6 +146,8 @@ demo_run <- function() {
                         host = config$db$host, 
                         user = config$db$user,
                         password = config$db$pass)
+  
+  checks <- tbl(ep_db, 'checks')
   
 }
   
