@@ -1,5 +1,5 @@
 source('r/smstower.r')
-
+source('r/websms.r')
 
 str_extract_numbs <- function(s) {
   if(length(s) > 1) return(lapply(s, str_extract_numbs))
@@ -94,19 +94,26 @@ add_used_sms <- function(new_used, conn, table) {
   
 }
 
-validate_sms <- function(sms, test.types) {
+validate_sms <- function(sms, test.types, stations) {
+  if(dim(sms)[1] > 1) stop ("Only one sms allowed")
   if(missing(test.types)) test.types <- c('digits', 'uik',
                                           'amount', 'sum')
-  results <- data.frame(id = sms$id)
+  
+  numbs <- str_extract_numbs(sms$text)
   
   if('digits' %in% test.types) {
-    digits <- unlist(lapply(sms$text, function(x) {
-      numbs <- str_extract_numbs(x)
-      as.integer(length(numbs) > 0)
-    }))
-    results <- cbind(results, digits)
+      if(length(numbs) == 0) return(1)
+    }
+    
+  if('uik' %in% test.types) {
+    if(!(numbs[1] %in% stations$station)) return(2)
   }
-  results
+  
+  if('amount' %in% test.types) {
+    if(length(numbs) != stations$candidates + 3) return(3)
+  }
+  
+  return(0)
 }
 
 full_run <- function(simulate) {
@@ -129,3 +136,19 @@ full_run <- function(simulate) {
   new_used_sms <-data$id
   
 }
+
+demo_run <- function() {
+  library(dplyr)
+  source('r/functions.r')
+  
+  config <- read_config()
+  
+  ep_db <- src_postgres(dbname = config$db$db, 
+                        host = config$db$host, 
+                        user = config$db$user,
+                        password = config$db$pass)
+  
+}
+  
+
+  
