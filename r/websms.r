@@ -10,7 +10,8 @@ websms_getdata <- function(user, passwd, startdate, enddate) {
                                           startdate = startdate,
                                           enddate = enddate,
                                           format = "xml"),
-           config(cainfo = cafile, ssl.verifypeer = FALSE))
+           config(cainfo = cafile, ssl.verifypeer = FALSE,
+                  encoding = "CP1251"))
   
   r <- xmlToList(xmlParse(r))
   r <- dplyr::rbind_all(lapply(r, function(x) {
