@@ -139,6 +139,8 @@ full_run <- function(simulate) {
 
 demo_run <- function() {
   library(dplyr)
+  library(lubridate)
+  library(stringr)
   
   config <- read_config()
   
@@ -147,9 +149,38 @@ demo_run <- function() {
                         user = config$db$user,
                         password = config$db$pass)
   
-  checks <- tbl(ep_db, 'checks')
+  checks <- collect(tbl(ep_db, 'checks1'))
+  last_check <- checks$time[dim(checks)[1]]
+  last_check <- format(dmy_hms(last_check) + seconds(1),
+                       format("%d.%m.%Y %H:%M:%S"))
   
+  data <- websms_getdata(config$websms$user, 
+                         config$websms$pass,  
+                         startdate = last_check, 
+                         enddate = "14.09.2014")
+  
+  if(nrow(data) == 0) {
+    DBI::dbDisconnect(ep_db$con)
+    return()
+  }
+  
+  lapply(data$agent, function(x) {
+    websms_sendsms(str_c("Vashe sms prinyato ", now()),
+                   recipient = x,
+                   config$websms$sender,
+                   config$websms$user, 
+                   config$websms$pass)})
+  
+  last_check <- data$time[dim(data)[1]]
+  last_check <- format(last_check,
+                       format("%d.%m.%Y %H:%M:%S"))
+  lastcheck_sql <- str_c(
+"INSERT INTO checks1(time) 
+VALUES ('", last_check, "') ;")
+  
+  DBI::dbSendQuery(ep_db$con, lastcheck_sql)
+
+  DBI::dbDisconnect(ep_db$con)
 }
   
-
   
