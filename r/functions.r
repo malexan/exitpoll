@@ -1,5 +1,10 @@
+library(dplyr)
+library(lubridate)
+library(stringr)
+
 source('r/smstower.r')
 source('r/websms.r')
+source('r/proc_data.r')
 
 str_extract_numbs <- function(s) {
   if(length(s) > 1) return(lapply(s, str_extract_numbs))
@@ -17,24 +22,26 @@ reported_hour <- function(smstime, deadline) {
   ifelse(minute(smstime) < deadline, hour(smstime), hour(smstime) + 1)
 }
 
-melt_text <- function(id, data, deadline,
-                      id.name = 'id', 
-                      text.name = 'text') {
-  if(length(id) > 1) return(dplyr::rbind_all(lapply(id, melt_text, data = data,
-                                                    deadline = deadline,
-                                                    id.name = id.name,
-                                                    text.name = text.name)))
-  
-  text <- data[[text.name]][data[[id.name]]==id]
-  numbers <- str_extract_numbs(text)
-  data.frame(id = id,
-             position = seq_along(numbers),
-             value = numbers)
+melt_text <- function(data, deadline) {
+
+  rbind_all(lapply(seq_len(nrow(data)), 
+                   function(r) {
+                     text <- data$text[r]
+                     numbers <- str_extract_numbs(text)
+                     hour <- reported_hour(data$time[r], deadline)
+                     df <- data.frame(sms = data$id[r],
+                                      position = seq_along(numbers),
+                                      value = numbers,
+                                      hour = hour)
+                     df$station <- df$value[df$position == 1]
+                     df <- df[df$position != 1,]
+                     df
+                     }))
 }
 
 read_config <- function(filename = 'config.yml') {
   library(yaml)
-  yaml.load_file('config.yml')
+  return(yaml.load_file('config.yml'))
 }
 
 # initiate_db <- function
@@ -94,12 +101,12 @@ add_used_sms <- function(new_used, conn, table) {
   
 }
 
-validate_sms <- function(sms, test.types, stations) {
-  if(dim(sms)[1] > 1) stop ("Only one sms allowed")
+validate_sms <- function(sms, stations, test.types) {
+  if(length(sms) > 1) stop ("Only one sms allowed")
   if(missing(test.types)) test.types <- c('digits', 'uik',
                                           'amount', 'sum')
   
-  numbs <- str_extract_numbs(sms$text)
+  numbs <- str_extract_numbs(sms)
   
   if('digits' %in% test.types) {
       if(length(numbs) == 0) return(1)
@@ -110,32 +117,17 @@ validate_sms <- function(sms, test.types, stations) {
   }
   
   if('amount' %in% test.types) {
-    if(length(numbs) != stations$candidates + 3) return(3)
+    # TODO: Amount of numbers hardcoded
+    if(length(numbs) != 8) return(3)
   }
   
+  if('sum' %in% test.types) {
+    if(sum(numbs[3:8]) > numbs[2]) return(4)
+  }
+    
   return(0)
 }
 
-full_run <- function(simulate) {
-  library(dplyr)
-  source('r/functions.r')
-  
-  config <- read_config()
-  
-  ep_db <- src_postgres(dbname = config$db$db, 
-                        host = config$db$host, 
-                        user = config$db$user,
-                        password = config$db$pass)
-  
-  used_remote_tbl <- tbl(ep_db, "used")
-  
-  data <- smstower_getdata(config$smstower$user, 
-                          config$smstower$pass, 
-                          as.data.frame(used_remote_tbl)$id[-100])
-  
-  new_used_sms <-data$id
-  
-}
 
 demo_run <- function() {
   library(dplyr)
@@ -164,12 +156,21 @@ demo_run <- function() {
     return()
   }
   
-  lapply(data$agent, function(x) {
-    websms_sendsms(str_c("Vashe sms prinyato ", now()),
-                   recipient = x,
-                   config$websms$sender,
-                   config$websms$user, 
-                   config$websms$pass)})
+  
+  data <- cbind(data, status = apply(
+    data, 1, function(x) validate_sms(x[['text']])))
+  
+  apply(data, 1, function(x) {
+    if(x[['status']] == 0) {
+      websms_sendsms("Vashe sms prinyato. Oshibok ne obnaruzheno",
+                     recipient = x[['agent']],
+                     config$websms$sender,
+                     config$websms$user, 
+                     config$websms$pass)
+      return()
+    }
+    request_correction(x)
+  })
   
   last_check <- data$time[dim(data)[1]]
   last_check <- format(last_check,
@@ -183,4 +184,56 @@ VALUES ('", last_check, "') ;")
   DBI::dbDisconnect(ep_db$con)
 }
   
+  
+request_correction <- function(sms, config) {
+  if(as.integer(sms[['status']]) == 0) {
+    warning('SMS is correct, request is not required')
+    return()}
+  request_text <- function(error_code) {
+    switch(as.integer(error_code),
+           "Oshibka: net chisel v sms-otchete",
+           "Oshibka: neizvestniy nomer uchastka",
+           "Oshibka: nepravilnoe kolichestvo chisel v sms-otchete",
+           "Oshibka: summa golosov i otkazov bolshe yavki")}
+  request <- request_text(sms[['status']])
+  websms_sendsms(request, 
+                 recipient = sms[['agent']],
+                 config$websms$sender,
+                 config$websms$user, 
+                 config$websms$pass)
+}
+
+add_sms_id <- function(data, ep_db) {
+  sms_sql <- tbl(ep_db, 'sms')
+  last_old_sms_id <- sms_sql %>% 
+    select(id) %>%
+    filter(id == max(id)) %>%
+    collect %>% unlist %>% unname
+  data$id <- (last_old_sms_id + 1):(last_old_sms_id + nrow(data))
+  data
+}
+
+connect_db <- function(config) {
+  
+  db <- src_postgres(dbname = config$db$db, 
+                        host = config$db$host, 
+                        user = config$db$user,
+                        password = config$db$pass)
+  db
+}
+
+get_last_check <- function(ep_db) {
+  checks <- collect(tbl(ep_db, 'checks1'))
+  last_check <- checks$time[dim(checks)[1]]
+  last_check <- format(dmy_hms(last_check) + seconds(1),
+                       format("%d.%m.%Y %H:%M:%S"))
+  last_check
+}
+
+get_stations <- function(ep_db) {
+  stations <- collect(tbl(ep_db, 'stations'))
+  districts <- collect(tbl(ep_db, 'districts'))
+  data <- inner_join(stations, districts, by = 'district')
+  data %>% select(station, name, voters, address, reserve)
+}
   

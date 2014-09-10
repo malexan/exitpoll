@@ -14,7 +14,7 @@ websms_getdata <- function(user, passwd, startdate, enddate) {
                   encoding = "CP1251"))
   
   r <- xmlToList(xmlParse(r))
-  if (r[[1]][[2]] == "no records found") return (data.frame())
+  if (r[[1]][[2]][[1]] == "no records found") return (data.frame())
   r <- dplyr::rbind_all(lapply(r, function(x) {
     data.frame(time = x$.attrs[['sms_date']], 
                text = x$text,
