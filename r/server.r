@@ -30,11 +30,8 @@ shinyServer(function(input, output, session) {
     paste("Последний смс-отчёт принят:", last_check)
   })
   
-  totalturnout <- reactive({
-    
-    invalidateLater(update_period, session)
-    
-    stations_turnout <- data_sql %>% 
+  stations_turnout_r <- reactive({
+    data_sql %>% 
       group_by(station, hour) %>%
       filter(min_rank(desc(sms)) == 1 &
                position == 2) %>%
@@ -49,6 +46,30 @@ shinyServer(function(input, output, session) {
                 turnout = sum(stationturnout),
                 prop = turnout / voters) %>%
       mutate(propdelta = weighted.mean(prop, voters) - prop)
+  })
+  
+  
+  totalturnout <- reactive({
+    
+#     invalidateLater(update_period, session)
+    
+#     stations_turnout <- data_sql %>% 
+#       group_by(station, hour) %>%
+#       filter(min_rank(desc(sms)) == 1 &
+#                position == 2) %>%
+#       collect %>%
+#       group_by(station) %>% 
+#       summarize(stationturnout = sum(value)) %>%
+#       inner_join(stations_sql %>%
+#                    select(station, voters) %>%
+#                    collect, 'station') %>%
+#       group_by(station) %>%
+#       summarize(voters = sum(voters),
+#                 turnout = sum(stationturnout),
+#                 prop = turnout / voters) %>%
+#       mutate(propdelta = weighted.mean(prop, voters) - prop)
+    
+    stations_turnout <- stations_turnout_r()
     
     turnout <- weighted.mean(stations_turnout$prop, 
                              stations_turnout$voters)
