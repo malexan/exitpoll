@@ -2,9 +2,7 @@ library(dplyr)
 library(lubridate)
 library(stringr)
 
-source('r/smstower.r')
-source('r/websms.r')
-source('r/proc_data.r')
+
 
 str_extract_numbs <- function(s) {
   if(length(s) > 1) return(lapply(s, str_extract_numbs))
@@ -39,21 +37,10 @@ melt_text <- function(data, deadline) {
                      }))
 }
 
-read_config <- function(filename = 'config.yml') {
-  library(yaml)
-  return(yaml.load_file('config.yml'))
-}
-
-# initiate_db <- function
-
-
-
 simulate_report <- function(station, hour, candidates, 
                             turnout.prob, refuse.prob,
                             stationsdata) {
-  
-  library(stringr)
-  
+
   if(missing(turnout.prob)) turnout.prob <- 
     c(123, 204, 327, 312, 372, 301, 253, 175, 149, 116, 116, 116)/12791
   
@@ -103,88 +90,31 @@ add_used_sms <- function(new_used, conn, table) {
 
 validate_sms <- function(sms, stations, test.types) {
   if(length(sms) > 1) stop ("Only one sms allowed")
-  if(missing(test.types)) test.types <- c('digits', 'uik',
-                                          'amount', 'sum')
   
   numbs <- str_extract_numbs(sms)
+  if(length(numbs) == 0) return(1)
+   
+  if(!(numbs[1] %in% stations$station)) return(2)
+
+  station <- numbs[1]
+  type <- stations$reserve[stations$station == station]
+  district <- stations$district[stations$station == station]
+  size <- 8
+  if(type == 2 & district == 11) size <- size + 6
+  if(type == 2 & district == 20) size <- size + 6
+  if(type == 3 & district == 11) size <- 8
+  if(type == 3 & district == 20) size <- 8
+  if(length(numbs) != size) return(3)
   
-  if('digits' %in% test.types) {
-      if(length(numbs) == 0) return(1)
-    }
-    
-  if('uik' %in% test.types) {
-    if(!(numbs[1] %in% stations$station)) return(2)
-  }
   
-  if('amount' %in% test.types) {
-    # TODO: Amount of numbers hardcoded
-    if(length(numbs) != 8) return(3)
-  }
   
-  if('sum' %in% test.types) {
-    if(sum(numbs[3:8]) > numbs[2]) return(4)
-  }
+  if(type %in% c(0,3) & sum(numbs[3:8]) > numbs[2]) return(4)
+  if(type == 2 & (sum(numbs[3:8]) > numbs[2] |
+                    sum(numbs[9:14]) > numbs[2])) return(4)
     
   return(0)
 }
 
-
-demo_run <- function() {
-  library(dplyr)
-  library(lubridate)
-  library(stringr)
-  
-  config <- read_config()
-  
-  ep_db <- src_postgres(dbname = config$db$db, 
-                        host = config$db$host, 
-                        user = config$db$user,
-                        password = config$db$pass)
-  
-  checks <- collect(tbl(ep_db, 'checks1'))
-  last_check <- checks$time[dim(checks)[1]]
-  last_check <- format(dmy_hms(last_check) + seconds(1),
-                       format("%d.%m.%Y %H:%M:%S"))
-  
-  data <- websms_getdata(config$websms$user, 
-                         config$websms$pass,  
-                         startdate = last_check, 
-                         enddate = "14.09.2014")
-  
-  if(nrow(data) == 0) {
-    DBI::dbDisconnect(ep_db$con)
-    return()
-  }
-  
-  
-  data <- cbind(data, status = apply(
-    data, 1, function(x) validate_sms(x[['text']])))
-  
-  apply(data, 1, function(x) {
-    if(x[['status']] == 0) {
-      websms_sendsms("Vashe sms prinyato. Oshibok ne obnaruzheno",
-                     recipient = x[['agent']],
-                     config$websms$sender,
-                     config$websms$user, 
-                     config$websms$pass)
-      return()
-    }
-    request_correction(x)
-  })
-  
-  last_check <- data$time[dim(data)[1]]
-  last_check <- format(last_check,
-                       format("%d.%m.%Y %H:%M:%S"))
-  lastcheck_sql <- str_c(
-"INSERT INTO checks1(time) 
-VALUES ('", last_check, "') ;")
-  
-  DBI::dbSendQuery(ep_db$con, lastcheck_sql)
-
-  DBI::dbDisconnect(ep_db$con)
-}
-  
-  
 request_correction <- function(sms, config) {
   if(as.integer(sms[['status']]) == 0) {
     warning('SMS is correct, request is not required')
@@ -213,15 +143,6 @@ add_sms_id <- function(data, ep_db) {
   data
 }
 
-connect_db <- function(config) {
-  
-  db <- src_postgres(dbname = config$db$db, 
-                        host = config$db$host, 
-                        user = config$db$user,
-                        password = config$db$pass)
-  db
-}
-
 get_last_check <- function(ep_db) {
   checks <- collect(tbl(ep_db, 'checks1'))
   last_check <- checks$time[dim(checks)[1]]
@@ -234,6 +155,6 @@ get_stations <- function(ep_db) {
   stations <- collect(tbl(ep_db, 'stations'))
   districts <- collect(tbl(ep_db, 'districts'))
   data <- inner_join(stations, districts, by = 'district')
-  data %>% select(station, name, voters, address, reserve)
+  data %>% select(station, name, voters, address, reserve, district)
 }
   

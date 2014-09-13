@@ -16,6 +16,12 @@ websms_getdata <- function(user, passwd, startdate, enddate) {
   r <- xmlToList(xmlParse(r))
   if (r[[1]][[2]][[1]] == "no records found") return (data.frame())
   r <- dplyr::rbind_all(lapply(r, function(x) {
+    if(names(x)[1] == 'sms_date') { # In case of sms with empty body
+      return(data.frame(time = x[['sms_date']],
+                        text = "",
+                        agent = x[['telnum']],
+                        stringsAsFactors = F))}
+    
     data.frame(time = x$.attrs[['sms_date']], 
                text = x$text,
                agent = x$.attrs[['telnum']],
