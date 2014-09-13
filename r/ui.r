@@ -15,18 +15,19 @@ shinyUI(fluidPage(
   
   mainPanel(tabsetPanel(type = "tabs",
                         tabPanel("Главное", 
-                                 tableOutput("turnout"))#,
-#                                  tableOutput("props"),
-#                                  textOutput("sec_turn"),
-#                                  plotOutput("turnoutplot",
-#                                             width = "100px",
-#                                             height = "250px", 
-#                                             inline = F),
-#                                  plotOutput("propplot",
-#                                             width = "400px",
-#                                             height = "250px", 
-#                                             inline = F)) #,
-                      #  tabPanel("Районы")
+                                 textOutput("lastupdate"),
+                                 tableOutput("turnout"),
+                                 tableOutput("props"),
+                                 textOutput("sec_turn"),
+                                 plotOutput("turnoutplot",
+                                            width = "100px",
+                                            height = "250px", 
+                                            inline = F),
+                                 plotOutput("propplot",
+                                            width = "400px",
+                                            height = "250px", 
+                                            inline = F)),
+                       tabPanel("Районы")
                         )
             )
   )

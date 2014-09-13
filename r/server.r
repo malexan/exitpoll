@@ -147,7 +147,9 @@ shinyServer(function(input, output) {
                          labels = percent) + xlab('')
   })
   
-  
+  output$lastupdate <- renderText({
+    lastupdate()
+  })
   
   output$turnout <- renderTable({
     totalturnout()
