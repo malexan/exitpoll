@@ -14,10 +14,15 @@ data_sql <- tbl(ep_db, 'data')
 stations_sql <- tbl(ep_db, 'stations')
 governors_sql <- tbl(ep_db, 'governors')
 checks_sql <- tbl(ep_db, 'checks1')
+update_period <- 30000
+update_info <- function(up_per, ses) {
+  invalidateLater(up_per, ses)
+}
 
-shinyServer(function(input, output) {
+shinyServer(function(input, output, session) {
   
   lastupdate <- reactive({
+    update_info(update_period, session)
     checks <- checks_sql %>% collect
     last_check <- checks$time[dim(checks)[1]]
     last_check <- format(dmy_hms(last_check),
@@ -26,6 +31,8 @@ shinyServer(function(input, output) {
   })
   
   totalturnout <- reactive({
+    
+    invalidateLater(update_period, session)
     
     stations_turnout <- data_sql %>% 
       group_by(station, hour) %>%
@@ -63,6 +70,9 @@ shinyServer(function(input, output) {
   })
   
   props <- reactive({
+    
+
+    
     candids <- data_sql %>%
       collect %>%
       group_by(station, hour) %>%
@@ -101,6 +111,9 @@ shinyServer(function(input, output) {
   })
   
   sec_turn <- reactive({
+    
+
+    
     sec_turn <- data_sql %>%
       collect %>%
       group_by(station, hour) %>%
@@ -116,11 +129,14 @@ shinyServer(function(input, output) {
                    totalvotes, 
                    alternative = 'gre',
                    conf.level = input$alpha))
-    paste("Вероятность второго тура на текущий момент", 
+    paste("Вероятность второго тура по текущим результатам", 
           round(r$p.value * 100, 1), "%", sep = "")
   })
   
   output$turnoutplot <- renderPlot({
+    
+
+    
     r <- totalturnout()
     colnames(r) <- c('voters', 'prop', 'cimin', 'cimax')
     ggplot(r, aes(x = as.factor(1), y = prop,
@@ -136,6 +152,9 @@ shinyServer(function(input, output) {
   })
   
   output$propplot <- renderPlot({
+    
+
+    
     d <- props()
     colnames(d) <- c("cand", "count", "prop", "low", "high")
     ggplot(d, aes(cand, prop, ymax = high, ymin = low)) +
