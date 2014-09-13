@@ -16,6 +16,7 @@ shinyUI(fluidPage(
   mainPanel(tabsetPanel(type = "tabs",
                         tabPanel("Главное", 
                                  textOutput("lastupdate"),
+                                 br(),
                                  tableOutput("turnout"),
                                  tableOutput("props"),
                                  textOutput("sec_turn"),
@@ -27,7 +28,10 @@ shinyUI(fluidPage(
                                             width = "400px",
                                             height = "250px", 
                                             inline = F)),
-                       tabPanel("Районы")
+                       tabPanel("Районы"),
+                       tabPanel("Участки"),
+                       tabPanel("Главы"),
+                       tabPanel("Ход exitpoll")
                         )
             )
   )
