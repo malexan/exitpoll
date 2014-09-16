@@ -37,6 +37,20 @@ melt_text <- function(data, deadline) {
                      }))
 }
 
+manual_add <- function(text) {
+  numbers <- str_extract_numbs(text)
+  hour <- numbers[1]
+  numbers <- numbers[-1]
+  df <- data.frame(sms = 111111,
+                   position = seq_along(numbers),
+                   value = numbers,
+                   hour = hour)
+  df$station <- df$value[df$position == 1]
+  df <- df[df$position != 1,]
+  DBI::dbWriteTable(ep_db$con, 'data', df, append = T, row.names = F)
+}
+
+
 simulate_report <- function(station, hour, candidates, 
                             turnout.prob, refuse.prob,
                             stationsdata) {

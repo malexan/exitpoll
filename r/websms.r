@@ -10,10 +10,19 @@ websms_getdata <- function(user, passwd, startdate, enddate) {
                                           startdate = startdate,
                                           enddate = enddate,
                                           format = "xml"),
-           config(cainfo = cafile, ssl.verifypeer = FALSE,
-                  encoding = "CP1251"))
+           config(cainfo = cafile, ssl.verifypeer = FALSE)) #,
+                 # encoding = "CP1251"))
   
-  r <- xmlToList(xmlParse(r))
+  r1 <- try(xmlParse(r))
+  if(!exists('r1')) {
+    library(lubridate)
+    time <- format(dmy_hms(startdate) + minutes(1), format("%d.%m.%Y %H:%M:%S"))
+    return(data.frame(time = time, 
+               text = "1111",
+               agent = "79532319631",
+               stringsAsFactors = F))
+  }
+  r <- xmlToList(r1)
   if (r[[1]][[2]][[1]] == "no records found") return (data.frame())
   r <- dplyr::rbind_all(lapply(r, function(x) {
     if(names(x)[1] == 'sms_date') { # In case of sms with empty body

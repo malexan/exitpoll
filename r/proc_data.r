@@ -13,7 +13,7 @@ proc_data <- function(deadline = 40, simulate) {
   data <- websms_getdata(config$websms$user, 
                          config$websms$pass,  
                          startdate = last_check, 
-                         enddate = "14.09.2014")  
+                         enddate = "15.09.2014")  
   
   if(nrow(data) == 0) {
     DBI::dbDisconnect(ep_db$con)
