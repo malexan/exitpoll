@@ -1,4 +1,4 @@
 exitpoll
 ========
 
-Package for processing of data from sms messages and publishing a webreport
+~~Package~~ Script for processing of data from sms messages and publishing a webreport
